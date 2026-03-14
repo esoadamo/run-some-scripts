@@ -272,7 +272,7 @@ function notify(message) {
             setStatus("");
             break;
         case "get-failed":
-            setStatus(MESSAGES[data]);
+            setStatus(MESSAGES[data] || "An unknown error occurred: " + data);
             applyBtn.textContent = "Retry";
             applyBtn.disabled = false;
             break;
@@ -282,7 +282,7 @@ function notify(message) {
             break;
         case "set-failed":
             setComponentsDisabled(false);
-            setStatus(MESSAGES[data]);
+            setStatus(MESSAGES[data] || "An unknown error occurred: " + data);
             break;
     }
 }

@@ -66,9 +66,6 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 /** @type {string} Current extension version from manifest.json. */
 const VERSION = browser.runtime.getManifest().version;
 
-/** @type {string[]} All known settings schema versions, used for migration validation. */
-const ALL_VERSIONS = ["1.0.0", "1.0.1", "1.1.0", VERSION];
-
 /**
  * Active userScript registrations. Each entry is the return value of
  * browser.userScripts.register() and has an .unregister() method.
@@ -114,10 +111,10 @@ function send(id, initiator, data = null) {
 function notify(message) {
     switch (message.id) {
         case "get":
-            queue.then(() => handleGet(message.initiator));
+            queue = queue.then(() => handleGet(message.initiator));
             break;
         case "set":
-            queue.then(() => handleSet(message.initiator, message.data));
+            queue = queue.then(() => handleSet(message.initiator, message.data));
             break;
     }
 }
@@ -150,13 +147,25 @@ async function handleGet(initiator) {
  * @param {Settings} settings  - New settings object containing the rules array.
  */
 async function handleSet(initiator, settings) {
+    // Validate incoming data before persisting — reject malformed rules early.
+    try {
+        validateRules(settings.rules || []);
+    } catch (err) {
+        console.log(`Validation failed for incoming settings: ${err}`);
+        await send("set-failed", initiator, "validate.settings");
+        return;
+    }
+
     // Step 1: tear down all existing script injections
     await unregisterAll();
 
-    // Step 2: persist to browser.storage.local
+    // Step 2: persist only known keys to browser.storage.local
+    // (prevents storage pollution from unexpected extra fields)
     try {
-        settings.version = VERSION;
-        await browser.storage.local.set(settings);
+        await browser.storage.local.set({
+            version: VERSION,
+            rules: settings.rules
+        });
     } catch (err) {
         console.log(`Error while writing data to storage: ${err}`);
         await send("set-failed", initiator, "persist.settings");
@@ -165,7 +174,7 @@ async function handleSet(initiator, settings) {
 
     // Step 3: register userScripts for each enabled rule
     try {
-        await registerAll(settings);
+        await registerAll({ rules: settings.rules });
     } catch (err) {
         console.log(`Error while registering scripts: ${err}`);
         await send("set-failed", initiator, "activate.script");

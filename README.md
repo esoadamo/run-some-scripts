@@ -1,5 +1,37 @@
 # run-a-script
 
+## Threat Model
+
+This extension is built for paranoid people. The entire codebase is deliberately tiny — a handful of files, each short enough to read in one sitting. No build step transforms the source, no dependencies are fetched at runtime, and no data ever leaves your browser.
+
+**What you should verify before trusting it:**
+
+1. **Read the source.** The extension logic lives in just two files: `background.js` (~250 lines) and `settings.js` (~300 lines). Everything else is static (HTML, CSS, bundled libraries). There is no minification or obfuscation.
+2. **Check the bundled libraries.** `jquery-3.7.1.min.js` and `GRenderer.js` are vendored copies. You can diff them against the official releases to confirm they haven't been tampered with.
+3. **Understand the permissions.** The extension requests `storage` (to save your rules locally) and `<all_urls>` (to inject scripts into pages you choose). It declares `"data_collection_permissions": { "required": ["none"] }` — no data is collected or transmitted.
+4. **Understand the sandbox.** All user scripts run via Firefox's [userScripts API](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/userScripts), which executes them in an isolated sandbox. They cannot access extension APIs, read other tabs, or escalate privileges.
+
+**If you don't trust the published version:**
+
+1. Fork this repository.
+2. Change the `id` field in `manifest.json` → `browser_specific_settings.gecko.id` to something unique (e.g. `run-a-script@yourname.com`).
+3. Run `make` to build the `.xpi`.
+4. Upload it to [AMO self-distribution](https://addons.mozilla.org/en-US/developers/addon/submit/upload-unlisted) to get it signed by Mozilla — this gives you your own static build that only you control, with no auto-updates from anyone else.
+
+## Building
+
+```sh
+make
+```
+
+This produces an unsigned `.xpi` in the `dist/` directory. To install it in Firefox, it must be signed. Upload the `.xpi` to [AMO for self-distribution](https://addons.mozilla.org/en-US/developers/addon/submit/upload-unlisted) — Mozilla will sign it and return a downloadable `.xpi` you can install.
+
+To clean build artifacts:
+
+```sh
+make clean
+```
+
 ## Changes against original repo
 
 - multi-rule support: define multiple scripts, each scoped to a URL glob pattern
