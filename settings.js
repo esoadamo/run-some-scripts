@@ -16,6 +16,27 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
+/*
+ * SETTINGS PAGE SCRIPT — runs inside the browser_action popup and options_ui page.
+ *
+ * Responsibilities:
+ *   1. On load, request the current rules from the background script ("get" message).
+ *   2. Render a dynamic list of rule cards — one per injection rule.
+ *   3. Let the user add, edit, delete, import, and export rules.
+ *   4. On "Apply", collect all rules from the DOM and send them to the
+ *      background script ("set" message) for persistence and re-registration.
+ *
+ * Communication:
+ *   All data exchange with background.js happens via browser.runtime.sendMessage.
+ *   Each settings page instance has a random UUID so it only processes replies
+ *   addressed to it (multiple popups could theoretically be open).
+ *
+ * No data leaves the browser. The export feature creates a local JSON file
+ * via a Blob URL; import reads a local file via FileReader. Neither touches
+ * any network endpoint.
+ */
+
+/** @type {Object<string, string>} Maps error keys from background.js to user-facing messages. */
 const MESSAGES = {
     "deactivate.script": "Failed to deactivate current scripts, settings not " +
         "persisted.",
@@ -28,21 +49,41 @@ const MESSAGES = {
         "see the addon inspector."
 };
 
+/**
+ * Unique ID for this settings page instance.
+ * Used to filter incoming messages — only process replies addressed to us.
+ * @type {string}
+ */
 var uuid = crypto.randomUUID();
 
-var addRuleBtn = document.getElementById("add-rule");
-var applyBtn = document.getElementById("apply");
-var exportBtn = document.getElementById("export-btn");
-var importBtn = document.getElementById("import-btn");
-var importFile = document.getElementById("import-file");
-var statusLbl = document.getElementById("status");
-var rulesContainer = document.getElementById("rules-container");
-var versionLbl = document.getElementById("version");
+// --- DOM ELEMENT REFERENCES ---
+/** @type {HTMLButtonElement} */ var addRuleBtn = document.getElementById("add-rule");
+/** @type {HTMLButtonElement} */ var applyBtn = document.getElementById("apply");
+/** @type {HTMLButtonElement} */ var exportBtn = document.getElementById("export-btn");
+/** @type {HTMLButtonElement} */ var importBtn = document.getElementById("import-btn");
+/** @type {HTMLInputElement}  */ var importFile = document.getElementById("import-file");
+/** @type {HTMLSpanElement}   */ var statusLbl = document.getElementById("status");
+/** @type {HTMLDivElement}    */ var rulesContainer = document.getElementById("rules-container");
+/** @type {HTMLSpanElement}   */ var versionLbl = document.getElementById("version");
 
+/**
+ * Generate a short unique-enough identifier for a new rule.
+ * Combines a base-36 timestamp with random characters.
+ *
+ * @returns {string} Alphanumeric ID (e.g. "lx1a2b3cde").
+ */
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+/**
+ * Send a message to the background script.
+ * Automatically stamps the message with this page's UUID so the background
+ * script can route the reply back to us.
+ *
+ * @param {string} id     - Message type ("get" or "set").
+ * @param {*}      [data] - Optional payload (e.g. { rules: [...] } for "set").
+ */
 function send(id, data = null) {
     browser.runtime.sendMessage({
         "id": id,
@@ -51,6 +92,27 @@ function send(id, data = null) {
     });
 }
 
+/**
+ * Create a DOM card element for one rule and append it to the rules container.
+ *
+ * Each card contains:
+ *   - URL pattern input (glob syntax, default "*" = all URLs)
+ *   - Checkboxes: Enabled, Inject jQuery, Inject GRenderer
+ *   - Script textarea for user code
+ *   - Delete button to remove the card from the DOM
+ *
+ * The rule's ID is stored in the card's data-rule-id attribute so
+ * collectRules() can read it back when building the rules array.
+ *
+ * @param {Object}  rule                - Rule data to populate the card with.
+ * @param {string}  rule.id             - Unique rule identifier.
+ * @param {string}  rule.urlPattern     - URL glob pattern.
+ * @param {string}  rule.script         - User JavaScript code.
+ * @param {boolean} rule.enabled        - Whether the rule is active.
+ * @param {boolean} rule.injectJquery   - Whether to inject jQuery.
+ * @param {boolean} rule.injectGRenderer - Whether to inject GRenderer.
+ * @returns {HTMLDivElement} The created card element.
+ */
 function createRuleCard(rule) {
     var card = document.createElement("div");
     card.className = "rule-card";
@@ -107,6 +169,14 @@ function createRuleCard(rule) {
     return card;
 }
 
+/**
+ * Create a labeled checkbox element.
+ *
+ * @param {string}  className - CSS class applied to the <input> (used by collectRules).
+ * @param {string}  label     - Human-readable label text shown next to the checkbox.
+ * @param {boolean} checked   - Initial checked state.
+ * @returns {HTMLLabelElement} A <label> wrapping the checkbox and its text.
+ */
 function createCheckbox(className, label, checked) {
     var wrapper = document.createElement("label");
     var cb = document.createElement("input");
@@ -118,6 +188,15 @@ function createCheckbox(className, label, checked) {
     return wrapper;
 }
 
+/**
+ * Read the current state of all rule cards from the DOM and return
+ * them as a plain array of rule objects. This is the inverse of
+ * createRuleCard() — it extracts values from the inputs/checkboxes.
+ *
+ * If the URL pattern field is empty, it defaults to "*" (all URLs).
+ *
+ * @returns {Object[]} Array of rule objects ready to be sent to background.js.
+ */
 function collectRules() {
     var rules = [];
     var cards = rulesContainer.querySelectorAll(".rule-card");
@@ -134,6 +213,12 @@ function collectRules() {
     return rules;
 }
 
+/**
+ * Enable or disable all interactive UI elements (buttons, inputs, textareas).
+ * Used to lock the UI while an async operation is in progress.
+ *
+ * @param {boolean} disabled - True to disable all controls, false to enable.
+ */
 function setComponentsDisabled(disabled) {
     addRuleBtn.disabled = disabled;
     applyBtn.disabled = disabled;
@@ -144,19 +229,41 @@ function setComponentsDisabled(disabled) {
     });
 }
 
+/**
+ * Update the status text shown in the toolbar.
+ *
+ * @param {string} msg - Status message to display (empty string to clear).
+ */
 function setStatus(msg) {
     statusLbl.textContent = msg;
 }
 
+/**
+ * Message listener — handles replies from the background script.
+ * Only processes messages whose initiator matches our UUID.
+ *
+ * Handled reply types:
+ *   "get-ok"     — rules loaded successfully; render them as cards.
+ *   "get-failed" — storage read failed; show error, offer retry.
+ *   "set-ok"     — rules saved and registered; re-enable UI.
+ *   "set-failed" — save or register failed; show error, re-enable UI.
+ *
+ * @param {Object} message            - Incoming message.
+ * @param {string} message.id         - Reply type.
+ * @param {string} message.initiator  - UUID of the intended recipient.
+ * @param {*}      [message.data]     - Payload (settings or error key).
+ */
 function notify(message) {
     var { id, initiator, data } = message;
 
+    // Ignore messages addressed to other settings page instances.
     if (initiator !== uuid) {
         return;
     }
 
     switch (id) {
         case "get-ok":
+            // Clear old cards and render the loaded rules.
             rulesContainer.innerHTML = "";
             (data.rules || []).forEach(function (rule) {
                 createRuleCard(rule);
@@ -180,17 +287,30 @@ function notify(message) {
     }
 }
 
+/**
+ * Collect all rules from the DOM and send them to the background script
+ * for persistence and re-registration. Locks the UI until a reply arrives.
+ */
 function saveOptions() {
     setComponentsDisabled(true);
     setStatus("Applying settings...");
     send("set", { rules: collectRules() });
 }
 
+/**
+ * Request the current rules from the background script.
+ * Called on page load and when the user clicks "Retry" after a failed load.
+ */
 function restoreOptions() {
     setStatus("Loading persisted settings...");
     send("get");
 }
 
+/**
+ * Export the current rules as a JSON file download.
+ * Creates a Blob URL, triggers a download via a temporary <a> element,
+ * then revokes the URL. No network requests are made — everything is local.
+ */
 function exportRules() {
     var rules = collectRules();
     var blob = new Blob([JSON.stringify(rules, null, 2)], { type: "application/json" });
@@ -202,10 +322,21 @@ function exportRules() {
     URL.revokeObjectURL(url);
 }
 
+/**
+ * Open the file picker for importing rules.
+ * The actual import logic is in the "change" event handler on importFile.
+ */
 function importRules() {
     importFile.click();
 }
 
+/**
+ * Handle file selection for import.
+ * Reads the selected JSON file locally (no network), parses it, validates
+ * that it's an array, fills in any missing fields with safe defaults, and
+ * renders the imported rules as cards. The user must still click "Apply"
+ * to actually persist and activate them.
+ */
 importFile.addEventListener("change", function () {
     var file = importFile.files[0];
     if (!file) return;
@@ -220,7 +351,8 @@ importFile.addEventListener("change", function () {
             }
             rulesContainer.innerHTML = "";
             rules.forEach(function (rule) {
-                // Ensure each imported rule has all required fields
+                // Fill in missing fields with safe defaults so partial
+                // exports or hand-edited JSON still work.
                 createRuleCard({
                     id: rule.id || generateId(),
                     urlPattern: rule.urlPattern || "*",
@@ -236,9 +368,13 @@ importFile.addEventListener("change", function () {
         }
     };
     reader.readAsText(file);
+    // Reset file input so re-selecting the same file triggers "change" again.
     importFile.value = "";
 });
 
+// --- EVENT LISTENERS ---
+
+/** Add a new empty rule card with sensible defaults (all URLs, jQuery enabled). */
 addRuleBtn.addEventListener("click", function () {
     createRuleCard({
         id: generateId(),
@@ -254,6 +390,9 @@ applyBtn.addEventListener("click", saveOptions);
 exportBtn.addEventListener("click", exportRules);
 importBtn.addEventListener("click", importRules);
 
+// --- INITIALIZATION ---
+// Listen for replies from the background script.
 browser.runtime.onMessage.addListener(notify);
+// Load saved rules as soon as the DOM is ready.
 document.addEventListener("DOMContentLoaded", restoreOptions);
 versionLbl.textContent = "v" + browser.runtime.getManifest().version + " ";
