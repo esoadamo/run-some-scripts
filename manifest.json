@@ -1,8 +1,8 @@
 {
-  "description": "Allows you to define exactly one JS script and inject it into every web page you visit. It uses Firefox' userScripts feature which allows the sandboxed execution of user-defined scripts. For some convienience, jQuery is usable from your code. The code base is only a couple of lines so you can quickly check for security foul play. A critical tool in the fight against the modern internet.",
+  "description": "Define multiple JS scripts and inject them into web pages matching URL glob patterns. Uses Firefox' userScripts API for sandboxed execution. Optionally inject jQuery and GRenderer per rule. Minimal codebase you can review for security.",
   "manifest_version": 2,
   "name": "run-a-script",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "homepage_url": "https://github.com/esoadamo/run-a-script",
   "icons": {
     "16": "icons/doge.svg",

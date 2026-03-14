@@ -17,11 +17,11 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
 const MESSAGES = {
-    "deactivate.script": "Failed to deactivate current script, settings not " +
+    "deactivate.script": "Failed to deactivate current scripts, settings not " +
         "persisted.",
-    "persist.settings": "Failed to persist settings, no script currently " +
+    "persist.settings": "Failed to persist settings, no scripts currently " +
         "active.",
-    "activate.script": "Failed to activate new script but settings persisted.",
+    "activate.script": "Failed to activate new scripts but settings persisted.",
     "query.settings": "Failed to retrieve persisted data, see the addon " +
         "inspector.",
     "validate.settings": "Failed to validate persistent settings, " +
@@ -30,12 +30,18 @@ const MESSAGES = {
 
 var uuid = crypto.randomUUID();
 
-var form = document.querySelector("form")
-var apply_btn = document.getElementById("apply");
-var status_lbl = document.getElementById("status");
-var script_ed = document.getElementById("thescript");
-var enabled_cb = document.getElementById("enabled");
-var version_lbl = document.getElementById("version");
+var addRuleBtn = document.getElementById("add-rule");
+var applyBtn = document.getElementById("apply");
+var exportBtn = document.getElementById("export-btn");
+var importBtn = document.getElementById("import-btn");
+var importFile = document.getElementById("import-file");
+var statusLbl = document.getElementById("status");
+var rulesContainer = document.getElementById("rules-container");
+var versionLbl = document.getElementById("version");
+
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
 
 function send(id, data = null) {
     browser.runtime.sendMessage({
@@ -45,65 +51,209 @@ function send(id, data = null) {
     });
 }
 
-function notify(message) {
-    var {
-        id,
-        initiator,
-        data
-    } = message;
+function createRuleCard(rule) {
+    var card = document.createElement("div");
+    card.className = "rule-card";
+    card.dataset.ruleId = rule.id;
 
-    if (initiator != uuid) {
+    var header = document.createElement("div");
+    header.className = "rule-header";
+
+    var patternLabel = document.createElement("label");
+    patternLabel.textContent = "URL pattern: ";
+    var patternInput = document.createElement("input");
+    patternInput.type = "text";
+    patternInput.className = "rule-url-pattern";
+    patternInput.value = rule.urlPattern;
+    patternInput.placeholder = "* (all URLs)";
+    patternLabel.appendChild(patternInput);
+    header.appendChild(patternLabel);
+
+    var options = document.createElement("div");
+    options.className = "rule-options";
+
+    var enabledCb = createCheckbox("rule-enabled", "Enabled", rule.enabled);
+    var jqueryCb = createCheckbox("rule-inject-jquery", "Inject jQuery", rule.injectJquery);
+    var grenderCb = createCheckbox("rule-inject-grenderer", "Inject GRenderer", rule.injectGRenderer);
+    options.appendChild(enabledCb);
+    options.appendChild(jqueryCb);
+    options.appendChild(grenderCb);
+
+    var textarea = document.createElement("textarea");
+    textarea.className = "rule-script";
+    textarea.rows = 15;
+    textarea.cols = 95;
+    textarea.spellcheck = false;
+    textarea.value = rule.script;
+    textarea.placeholder = "// Your JavaScript code here...";
+
+    var actions = document.createElement("div");
+    actions.className = "rule-actions";
+    var deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "btn-delete";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", function () {
+        card.remove();
+    });
+    actions.appendChild(deleteBtn);
+
+    card.appendChild(header);
+    card.appendChild(options);
+    card.appendChild(textarea);
+    card.appendChild(actions);
+
+    rulesContainer.appendChild(card);
+    return card;
+}
+
+function createCheckbox(className, label, checked) {
+    var wrapper = document.createElement("label");
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = className;
+    cb.checked = checked;
+    wrapper.appendChild(cb);
+    wrapper.appendChild(document.createTextNode(" " + label));
+    return wrapper;
+}
+
+function collectRules() {
+    var rules = [];
+    var cards = rulesContainer.querySelectorAll(".rule-card");
+    cards.forEach(function (card) {
+        rules.push({
+            id: card.dataset.ruleId,
+            urlPattern: card.querySelector(".rule-url-pattern").value || "*",
+            script: card.querySelector(".rule-script").value,
+            enabled: card.querySelector(".rule-enabled").checked,
+            injectJquery: card.querySelector(".rule-inject-jquery").checked,
+            injectGRenderer: card.querySelector(".rule-inject-grenderer").checked
+        });
+    });
+    return rules;
+}
+
+function setComponentsDisabled(disabled) {
+    addRuleBtn.disabled = disabled;
+    applyBtn.disabled = disabled;
+    exportBtn.disabled = disabled;
+    importBtn.disabled = disabled;
+    rulesContainer.querySelectorAll("input, textarea, button").forEach(function (el) {
+        el.disabled = disabled;
+    });
+}
+
+function setStatus(msg) {
+    statusLbl.textContent = msg;
+}
+
+function notify(message) {
+    var { id, initiator, data } = message;
+
+    if (initiator !== uuid) {
         return;
     }
 
     switch (id) {
         case "get-ok":
-            script_ed.value = data.script
-            enabled_cb.checked = data.enabled
-            setComponentsStatus(false, "");
-            form.removeEventListener("submit", restoreOptions);
-            form.addEventListener("submit", saveOptions);
+            rulesContainer.innerHTML = "";
+            (data.rules || []).forEach(function (rule) {
+                createRuleCard(rule);
+            });
+            setComponentsDisabled(false);
+            setStatus("");
             break;
         case "get-failed":
-            status_lbl.textContent = MESSAGES[data];
-            apply_btn.textContent = "Retry";
-            apply_btn.disabled = false;
+            setStatus(MESSAGES[data]);
+            applyBtn.textContent = "Retry";
+            applyBtn.disabled = false;
             break;
         case "set-ok":
-            setComponentsStatus(false, "Settings applied successfully.");
+            setComponentsDisabled(false);
+            setStatus("Settings applied successfully.");
             break;
         case "set-failed":
-            setComponentsStatus(false, MESSAGES[data]);
+            setComponentsDisabled(false);
+            setStatus(MESSAGES[data]);
             break;
     }
 }
 
-function setComponentsStatus(disabled, msg) {
-    script_ed.disabled = disabled;
-    enabled_cb.disabled = disabled;
-    apply_btn.disabled = disabled;
-    status_lbl.textContent = msg;
+function saveOptions() {
+    setComponentsDisabled(true);
+    setStatus("Applying settings...");
+    send("set", { rules: collectRules() });
 }
 
-function saveOptions(ev) {
-    ev.preventDefault();
-
-    setComponentsStatus(true, "Applying settings...");
-
-    var settings = {
-        "script": script_ed.value,
-        "enabled": enabled_cb.checked
-    };
-
-    send("set", settings);
-}
-
-async function restoreOptions() {
-    status_lbl.textContent = "Loading perstited settings..."
+function restoreOptions() {
+    setStatus("Loading persisted settings...");
     send("get");
 }
 
+function exportRules() {
+    var rules = collectRules();
+    var blob = new Blob([JSON.stringify(rules, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "run-a-script-rules.json";
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importRules() {
+    importFile.click();
+}
+
+importFile.addEventListener("change", function () {
+    var file = importFile.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            var rules = JSON.parse(e.target.result);
+            if (!Array.isArray(rules)) {
+                setStatus("Invalid import file: expected an array of rules.");
+                return;
+            }
+            rulesContainer.innerHTML = "";
+            rules.forEach(function (rule) {
+                // Ensure each imported rule has all required fields
+                createRuleCard({
+                    id: rule.id || generateId(),
+                    urlPattern: rule.urlPattern || "*",
+                    script: rule.script || "",
+                    enabled: rule.enabled !== false,
+                    injectJquery: rule.injectJquery !== false,
+                    injectGRenderer: !!rule.injectGRenderer
+                });
+            });
+            setStatus("Rules imported. Click Apply to save.");
+        } catch (err) {
+            setStatus("Failed to parse import file: " + err.message);
+        }
+    };
+    reader.readAsText(file);
+    importFile.value = "";
+});
+
+addRuleBtn.addEventListener("click", function () {
+    createRuleCard({
+        id: generateId(),
+        urlPattern: "*",
+        script: "",
+        enabled: true,
+        injectJquery: true,
+        injectGRenderer: false
+    });
+});
+
+applyBtn.addEventListener("click", saveOptions);
+exportBtn.addEventListener("click", exportRules);
+importBtn.addEventListener("click", importRules);
+
 browser.runtime.onMessage.addListener(notify);
 document.addEventListener("DOMContentLoaded", restoreOptions);
-form.addEventListener("submit", restoreOptions);
-version_lbl.textContent = "v" + browser.runtime.getManifest().version;
+versionLbl.textContent = "v" + browser.runtime.getManifest().version + " ";

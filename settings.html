@@ -2,52 +2,126 @@
 <html>
   <head>
     <meta charset="utf-8"/>
+    <style>
+      body {
+        background: #c1c1c0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 13px;
+        margin: 0;
+        padding: 10px;
+      }
+      .toolbar {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .toolbar button {
+        padding: 5px 16px;
+        cursor: pointer;
+      }
+      #status {
+        margin-left: 10px;
+        font-style: italic;
+      }
+      #rules-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .rule-card {
+        background: #e8e8e7;
+        border: 1px solid #aaa;
+        border-radius: 4px;
+        padding: 10px;
+      }
+      .rule-header {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+      }
+      .rule-header label {
+        white-space: nowrap;
+      }
+      .rule-header input[type="text"] {
+        flex: 1;
+        min-width: 200px;
+        padding: 3px 6px;
+        font-family: monospace;
+      }
+      .rule-options {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+      }
+      .rule-options label {
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .rule-card textarea {
+        width: 100%;
+        box-sizing: border-box;
+        font-family: monospace;
+        font-size: 12px;
+        resize: vertical;
+      }
+      .rule-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+        justify-content: flex-end;
+      }
+      .rule-actions button {
+        padding: 3px 14px;
+        cursor: pointer;
+      }
+      .btn-delete {
+        background: #e06060;
+        color: #fff;
+        border: 1px solid #b04040;
+      }
+      .footer {
+        margin-top: 20px;
+        user-select: text;
+        cursor: auto;
+      }
+    </style>
   </head>
-  <body style="background: #c1c1c0">
-    <div style="margin: 10px">
-      <form>
-        <div>
-          <textarea cols="95" disabled="" id="thescript" rows="21" spellcheck="false"></textarea>
-        </div>
-        <div style="margin-top: 10px">
-          <input disabled="" id="enabled" name="enabled" type="checkbox"/>
-          <label for="enabled">
-            Enabled?
-          </label>
-        </div>
-        <div style="margin-top: 10px">
-          <button disabled="" id="apply" style="padding-top: 5px; padding-bottom: 5px; padding-left: 40px; padding-right: 40px" type="submit">
-            Apply
-          </button>
-          <span id="status" style="margin-left: 10px">
-          </span>
-        </div>
-      </form>
-      <div style="margin-top: 20px; user-select: text; cursor: auto">
-        <a href="https://github.com/MIvanchev/run-a-script/">
-          https://github.com/MIvanchev/run-a-script/
-        </a>
-        <br/>
-        <span id="version">
-        </span>
-        Copyright (C) 2022-present Mihail Ivanchev
-        <br/>
-        <br/>
-        jQuery is distributed under
-        <a href="https://jquery.org/license/">
-          its respective license.
-        </a>
-        <br/>
-        <br/>
-        The doge icon was sourced from
-        <a href="https://icon-library.com/icon/doge-icon-21.html">
-          https://icon-library.com/icon/doge-icon-21.html
-        </a>
-        <br/>
-        and subsequently modified.
-      </div>
+  <body>
+    <div class="toolbar">
+      <button id="add-rule" type="button" disabled>+ Add Rule</button>
+      <button id="apply" type="button" disabled>Apply</button>
+      <button id="export-btn" type="button" disabled>Export</button>
+      <button id="import-btn" type="button" disabled>Import</button>
+      <input type="file" id="import-file" accept=".json" style="display:none"/>
+      <span id="status"></span>
     </div>
-    <script src="settings.js">
-    </script>
+    <div id="rules-container"></div>
+    <div class="footer">
+      <a href="https://github.com/esoadamo/run-a-script/">
+        https://github.com/esoadamo/run-a-script/
+      </a>
+      <br/>
+      <span id="version"></span>
+      Copyright (C) 2022-present Mihail Ivanchev
+      <br/><br/>
+      jQuery is distributed under
+      <a href="https://jquery.org/license/">its respective license.</a>
+      <br/>
+      GRenderer is from
+      <a href="https://github.com/QRGameStudio/web-libs">QRGameStudio/web-libs</a>.
+      <br/><br/>
+      The doge icon was sourced from
+      <a href="https://icon-library.com/icon/doge-icon-21.html">
+        https://icon-library.com/icon/doge-icon-21.html
+      </a>
+      <br/>and subsequently modified.
+    </div>
+    <script src="settings.js"></script>
   </body>
 </html>

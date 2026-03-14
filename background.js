@@ -16,20 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 */
 
-const VERSION = browser.runtime.getManifest().version
-const ALL_VERSIONS = ["1.0.0", "1.0.1", VERSION]
+const VERSION = browser.runtime.getManifest().version;
+const ALL_VERSIONS = ["1.0.0", "1.0.1", "1.1.0", VERSION];
 
-const VALIDATORS = [
-    validateFieldPresent("version"),
-    validateFieldPresent("script"),
-    validateFieldPresent("enabled"),
-    validateFieldTypeAndValue("version", "string",
-        val => ALL_VERSIONS.includes(val)),
-    validateFieldTypeAndValue("script", "string"),
-    validateFieldTypeAndValue("enabled", "boolean")
-]
-
-var registration = null;
+var registrations = [];
 var queue = null;
 
 function send(id, initiator, data = null) {
@@ -60,22 +50,11 @@ async function handleGet(initiator) {
 }
 
 async function handleSet(initiator, settings) {
-
-    if (registration) {
-        try {
-            await registration.unregister();
-        } catch (err) {
-            console.log(`Error while unregistering script: ${err}`);
-            await send("set-failed", initiator, "deactivate.script");
-            return;
-        }
-
-        registration = null;
-    }
+    await unregisterAll();
 
     try {
-        settings.version = VERSION
-        await browser.storage.local.set(settings)
+        settings.version = VERSION;
+        await browser.storage.local.set(settings);
     } catch (err) {
         console.log(`Error while writing data to storage: ${err}`);
         await send("set-failed", initiator, "persist.settings");
@@ -83,9 +62,9 @@ async function handleSet(initiator, settings) {
     }
 
     try {
-        await register(settings);
+        await registerAll(settings);
     } catch (err) {
-        console.log(`Error while registering script: ${err}`);
+        console.log(`Error while registering scripts: ${err}`);
         await send("set-failed", initiator, "activate.script");
         return;
     }
@@ -93,53 +72,68 @@ async function handleSet(initiator, settings) {
     await send("set-ok", initiator);
 }
 
-function validateFieldPresent(field) {
-    return [
-        obj => field in obj,
-        `The field "${field}" was not found in the settings. The data was ` +
-        "probably tampered with. Please fix the problems before you can use " +
-        "the plugin. An easy fix is to just delete everything and start anew."
-    ]
-}
-
-function validateFieldTypeAndValue(field, type, validator = null) {
-    validation_fn = function(obj) {
-        var val = obj[field]
-        return typeof val === type && (validator ? validator(val) : true)
+async function unregisterAll() {
+    for (const reg of registrations) {
+        try {
+            await reg.unregister();
+        } catch (err) {
+            console.log(`Error while unregistering script: ${err}`);
+        }
     }
-
-    return [
-        validation_fn,
-        `The field "${field}" has an invalid type or an an invalid value. ` +
-        "The data was probably tampered with. Please fix the problems before " +
-        "you can use the plugin. An easy fix is to just delete everything " +
-        "and start anew."
-    ]
+    registrations = [];
 }
 
-function validateSettings(settings, ui_msg) {
-    VALIDATORS.forEach(([validator, msg]) => {
-        if (!validator(settings)) {
-            console.log(msg);
+function validateRules(rules) {
+    if (!Array.isArray(rules)) {
+        throw new Error("validate.settings");
+    }
+    for (const rule of rules) {
+        if (typeof rule.id !== "string" ||
+            typeof rule.urlPattern !== "string" ||
+            typeof rule.script !== "string" ||
+            typeof rule.enabled !== "boolean" ||
+            typeof rule.injectJquery !== "boolean" ||
+            typeof rule.injectGRenderer !== "boolean") {
             throw new Error("validate.settings");
         }
-    });
+    }
+}
+
+function migrateOldSettings(settings) {
+    // Migrate from old single-script format (v1.0.0 / v1.0.1)
+    if ("script" in settings && !("rules" in settings)) {
+        return {
+            version: VERSION,
+            rules: [{
+                id: generateId(),
+                urlPattern: "*",
+                script: settings.script || "",
+                enabled: !!settings.enabled,
+                injectJquery: true,
+                injectGRenderer: false
+            }]
+        };
+    }
+    return settings;
+}
+
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
 async function query() {
     var settings;
 
     try {
-        settings = await browser.storage.local.get()
+        settings = await browser.storage.local.get();
         if (Object.keys(settings).length === 0) {
-            // Compatiblity with 1.0.0, the settings might be in sync storage.
-            settings = await browser.storage.sync.get()
+            // Compatibility with 1.0.0, the settings might be in sync storage.
+            settings = await browser.storage.sync.get();
             if (Object.keys(settings).length === 0) {
                 settings = {
-                    "version": "1.0.0",
-                    "script": "",
-                    "enabled": false
-                }
+                    version: VERSION,
+                    rules: []
+                };
             } else if (!("version" in settings)) {
                 settings.version = "1.0.0";
             }
@@ -150,38 +144,63 @@ async function query() {
         throw new Error("query.settings");
     }
 
-    validateSettings(settings);
-    delete settings.version
+    settings = migrateOldSettings(settings);
+
+    if (!settings.rules) {
+        settings.rules = [];
+    }
+
+    validateRules(settings.rules);
+    delete settings.version;
 
     return settings;
 }
 
-async function register(settings) {
-    if (settings.enabled) {
+async function registerAll(settings) {
+    if (!settings.rules) return;
+
+    for (const rule of settings.rules) {
+        if (!rule.enabled) continue;
+        if (!rule.script.trim()) continue;
+
+        var jsFiles = [];
+
+        if (rule.injectJquery) {
+            jsFiles.push({ file: "jquery-3.7.1.min.js" });
+        }
+
+        if (rule.injectGRenderer) {
+            jsFiles.push({ file: "GRenderer.js" });
+        }
+
+        jsFiles.push({ code: rule.script });
+
         var options = {
-            "js": [{
-                "file": "jquery-3.7.1.min.js"
-            }, {
-                "code": settings.script
-            }],
-            "matches": ["http://*/*", "https://*/*"],
-            "runAt": "document_start"
+            js: jsFiles,
+            matches: ["http://*/*", "https://*/*"],
+            runAt: "document_start"
         };
 
+        // If urlPattern is not a catch-all, use includeGlobs to filter
+        if (rule.urlPattern && rule.urlPattern !== "*") {
+            options.includeGlobs = [rule.urlPattern];
+        }
+
         try {
-            registration = await browser.userScripts.register(options);
+            var reg = await browser.userScripts.register(options);
+            registrations.push(reg);
         } catch (err) {
-            console.log(`Error while registering script: ${err}`)
-            throw err
+            console.log(`Error while registering script for rule "${rule.id}": ${err}`);
+            throw err;
         }
     }
 }
 
 browser.runtime.onMessage.addListener(notify);
 
-queue = (async function() {
+queue = (async function () {
     try {
-        await register(await query());
+        await registerAll(await query());
     } catch (err) {
         /* Ignore error. */
     }

@@ -10,6 +10,7 @@ SOURCES := manifest.json \
            settings.html \
            settings.js \
            jquery-3.7.1.min.js \
+           GRenderer.js \
            icons/doge.svg \
            icons/doge-32.png \
            icons/doge-48.png \
