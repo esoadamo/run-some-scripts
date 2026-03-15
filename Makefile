@@ -11,11 +11,11 @@ SOURCES := manifest.json \
            settings.js \
            jquery-3.7.1.min.js \
            GRenderer.js \
-           icons/doge.svg \
-           icons/doge-32.png \
-           icons/doge-48.png \
-           icons/doge-64.png \
-           icons/doge-128.png
+           icons/dog.svg \
+           icons/dog-32.png \
+           icons/dog-48.png \
+           icons/dog-64.png \
+           icons/dog-128.png
 
 BUILD_FILES := $(addprefix $(BUILD_DIR)/,$(SOURCES))
 

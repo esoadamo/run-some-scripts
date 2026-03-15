@@ -88,7 +88,14 @@
       .footer {
         margin-top: 20px;
         user-select: text;
-        cursor: auto;
+      }
+      .footer summary {
+        cursor: pointer;
+        user-select: none;
+        color: #444;
+      }
+      .footer[open] summary {
+        margin-bottom: 6px;
       }
     </style>
   </head>
@@ -99,29 +106,29 @@
       <button id="export-btn" type="button" disabled>Export</button>
       <button id="import-btn" type="button" disabled>Import</button>
       <input type="file" id="import-file" accept=".json" style="display:none"/>
+      <button id="open-in-tab" type="button">&#x2197; Open in Tab</button>
       <span id="status"></span>
     </div>
     <div id="rules-container"></div>
-    <div class="footer">
-      <a href="https://github.com/esoadamo/run-a-script/">
-        https://github.com/esoadamo/run-a-script/
-      </a>
-      <br/>
-      <span id="version"></span>
-      Copyright (C) 2022-present Mihail Ivanchev
+    <details class="footer">
+      <summary>Credits</summary>
+      Based on <a href="https://github.com/MIvanchev/run-a-script/">run-a-script</a>
+      by Mihail Ivanchev,
+      edited to <a href="https://github.com/esoadamo/run-some-scripts/">run-some-scripts</a> by Adam Hlavacek.
       <br/><br/>
+      <span id="version"></span>
+      <br/>
       jQuery is distributed under
       <a href="https://jquery.org/license/">its respective license.</a>
       <br/>
       GRenderer is from
       <a href="https://github.com/QRGameStudio/web-libs">QRGameStudio/web-libs</a>.
       <br/><br/>
-      The doge icon was sourced from
-      <a href="https://icon-library.com/icon/doge-icon-21.html">
-        https://icon-library.com/icon/doge-icon-21.html
-      </a>
-      <br/>and subsequently modified.
-    </div>
+      The dog icon was sourced from
+      <a href="https://pixabay.com/vectors/dog-hound-robot-robotic-android-151196/">
+        OpenClipart-Vectors on Pixabay
+      </a> and subsequently modified.
+    </details>
     <script src="settings.js"></script>
   </body>
 </html>

@@ -61,19 +61,20 @@ var uuid = crypto.randomUUID();
 /** @type {HTMLButtonElement} */ var applyBtn = document.getElementById("apply");
 /** @type {HTMLButtonElement} */ var exportBtn = document.getElementById("export-btn");
 /** @type {HTMLButtonElement} */ var importBtn = document.getElementById("import-btn");
+/** @type {HTMLButtonElement} */ var openInTabBtn = document.getElementById("open-in-tab");
 /** @type {HTMLInputElement}  */ var importFile = document.getElementById("import-file");
 /** @type {HTMLSpanElement}   */ var statusLbl = document.getElementById("status");
 /** @type {HTMLDivElement}    */ var rulesContainer = document.getElementById("rules-container");
 /** @type {HTMLSpanElement}   */ var versionLbl = document.getElementById("version");
 
 /**
- * Generate a short unique-enough identifier for a new rule.
- * Combines a base-36 timestamp with random characters.
+ * Generate a unique identifier for a new rule.
+ * Uses crypto.randomUUID() to generate a standard UUID.
  *
- * @returns {string} Alphanumeric ID (e.g. "lx1a2b3cde").
+ * @returns {string} UUID (e.g. "123e4567-e89b-12d3-a456-426614174000").
  */
 function generateId() {
-    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    return crypto.randomUUID();
 }
 
 /**
@@ -288,6 +289,14 @@ function notify(message) {
 }
 
 /**
+ * Open the settings page in a persistent browser tab so it stays open
+ * when the user clicks away (unlike the browser-action popup).
+ */
+function openSettingsTab() {
+    browser.tabs.create({ url: browser.runtime.getURL("settings.html") });
+}
+
+/**
  * Collect all rules from the DOM and send them to the background script
  * for persistence and re-registration. Locks the UI until a reply arrives.
  */
@@ -317,7 +326,7 @@ function exportRules() {
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "run-a-script-rules.json";
+    a.download = "run-some-scripts-rules.json";
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -389,6 +398,7 @@ addRuleBtn.addEventListener("click", function () {
 applyBtn.addEventListener("click", saveOptions);
 exportBtn.addEventListener("click", exportRules);
 importBtn.addEventListener("click", importRules);
+openInTabBtn.addEventListener("click", openSettingsTab);
 
 // --- INITIALIZATION ---
 // Listen for replies from the background script.

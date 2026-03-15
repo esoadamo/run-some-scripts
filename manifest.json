@@ -1,15 +1,15 @@
 {
   "description": "Define multiple JS scripts and inject them into web pages matching URL glob patterns. Uses Firefox' userScripts API for sandboxed execution. Optionally inject jQuery and GRenderer per rule. Minimal codebase you can review for security.",
   "manifest_version": 2,
-  "name": "run-a-script",
-  "version": "1.1.0",
-  "homepage_url": "https://github.com/esoadamo/run-a-script",
+  "name": "run-some-scripts",
+  "version": "1.1.1",
+  "homepage_url": "https://github.com/esoadamo/run-some-scripts",
   "icons": {
-    "16": "icons/doge.svg",
-    "32": "icons/doge.svg",
-    "48": "icons/doge.svg",
-    "64": "icons/doge.svg",
-    "96": "icons/doge.svg"
+    "16": "icons/dog.svg",
+    "32": "icons/dog.svg",
+    "48": "icons/dog.svg",
+    "64": "icons/dog.svg",
+    "96": "icons/dog.svg"
   },
   "background": {
     "scripts": [
@@ -24,16 +24,16 @@
     "browser_style": true,
     "default_popup": "settings.html",
     "default_icon": {
-      "32": "icons/doge-32.png",
-      "48": "icons/doge-48.png",
-      "64": "icons/doge.svg",
-      "96": "icons/doge.svg"
+      "32": "icons/dog-32.png",
+      "48": "icons/dog-48.png",
+      "64": "icons/dog.svg",
+      "96": "icons/dog.svg"
     }
   },
   "browser_specific_settings": {
     "gecko": {
       "id": "run-a-script@adamhlavacek.com",
-      "strict_min_version": "78.0",
+      "strict_min_version": "142.0",
       "data_collection_permissions": {
         "required": ["none"]
       }

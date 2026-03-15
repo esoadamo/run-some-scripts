@@ -1,4 +1,4 @@
-# run-a-script
+# run-some-scripts
 
 ## Threat Model
 
@@ -14,7 +14,7 @@ This extension is built for paranoid people. The entire codebase is deliberately
 **If you don't trust the published version:**
 
 1. Fork this repository.
-2. Change the `id` field in `manifest.json` → `browser_specific_settings.gecko.id` to something unique (e.g. `run-a-script@yourname.com`).
+2. Change the `id` field in `manifest.json` → `browser_specific_settings.gecko.id` to something unique (e.g. `run-some-scripts@yourname.com`).
 3. Run `make` to build the `.xpi`.
 4. Upload it to [AMO self-distribution](https://addons.mozilla.org/en-US/developers/addon/submit/upload-unlisted) to get it signed by Mozilla — this gives you your own static build that only you control, with no auto-updates from anyone else.
 
@@ -45,9 +45,9 @@ make clean
 [![SemVer](https://img.shields.io/badge/version-1.1.0-brightgreen.svg)](http://semver.org)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
 
-A Firefox extension that lets you define **multiple JS scripts** and inject them into web pages matching **URL glob patterns**. It uses Firefox' [userScripts](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/userScripts) API which sandboxes JS code before execution. For each rule you can optionally inject [jQuery](https://jquery.com/) and/or [GRenderer](https://github.com/QRGameStudio/web-libs) as dependencies. The code of the extension is deliberately minimal — you are encouraged to review it for security before running it. Please report all problems you find in the [issues](https://github.com/esoadamo/run-a-script/issues).
+A Firefox extension that lets you define **multiple JS scripts** and inject them into web pages matching **URL glob patterns**. It uses Firefox' [userScripts](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/userScripts) API which sandboxes JS code before execution. For each rule you can optionally inject [jQuery](https://jquery.com/) and/or [GRenderer](https://github.com/QRGameStudio/web-libs) as dependencies. The code of the extension is deliberately minimal — you are encouraged to review it for security before running it. Please report all problems you find in the [issues](https://github.com/esoadamo/run-some-scripts/issues).
 
-run-a-script is meant for people with trust issues. There are plenty of extensions out there that you could easily re-implement with a small JS snippet instead of installing. Also useful with [uBlock Origin](https://github.com/gorhill/uBlock) for defeating aggressive sites.
+run-some-scripts is meant for people with trust issues. There are plenty of extensions out there that you could easily re-implement with a small JS snippet instead of installing. Also useful with [uBlock Origin](https://github.com/gorhill/uBlock) for defeating aggressive sites.
 
 The plugin supports:
 * multiple rules, each with its own script and URL pattern
